@@ -1,0 +1,247 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Listing {
+  id                  Int             @id @default(autoincrement())
+  description         String?
+  url                 String?         @unique
+  internalUrl         String?         @unique
+  slug                String          @unique
+  postalAddressId     Int?            @unique
+  postalAddress       PostalAddress?  @relation(fields: [postalAddressId], references: [id])
+  listingImages       ListingImage[]  
+  listingReviews      Review[]
+  propertyValue       String[]        @default([]) 
+  additionalType      String[]        @default([])
+  favorites           Favorite[]      
+  submissionId        Int?            @unique
+  submission          Submission?     @relation("Submission", fields: [submissionId], references: [id]) 
+  createdById         Int             
+  createdBy           User            @relation("UserListings", fields: [createdById], references: [id])
+  dtCreated           DateTime        @default(now())
+  dtLastModified      DateTime
+  claimedById         Int?            
+  claimedBy           User?           @relation("ClaimedBy", fields: [claimedById], references: [id])
+  dtClaimed           DateTime?
+}
+
+model Place {
+  id                  Int               @id @default(autoincrement())
+  geo                 GeoCoordinates?   @relation(fields: [geoId], references: [id])
+  geoId               Int?
+  address             PostalAddress?    @relation(fields: [addressId], references: [id])
+  addressId           Int?
+  publicAccess        Boolean?
+  Listing             Listing           @relation(fields: [listingId], references: [id])
+  listingId           Int
+  placeType           PlaceType
+  localBusinesses     LocalBusiness[]   @relation("LocalBusinessPlaces")
+}
+
+enum PlaceType {
+  ACCOMODATION
+  CIVIC_STRUCTURE
+  LOCAL_BUSINESS
+}
+
+model Organization {
+  id                  Int             @id @default(autoincrement())
+  legalName           String?
+  email               String?
+  telephone           String?
+  listingId           Int
+  listing             Listing         @relation(fields: [listingId], references: [id])
+  address             PostalAddress?  @relation(fields: [addressId], references: [id])
+  addressId           Int?
+}
+
+model LocalBusiness {
+  id                  Int               @id @default(autoincrement())
+  organizationId      Int
+  organization        Organization      @relation(fields: [organizationId], references: [id])
+  placeId             Int
+  place               Place[]           @relation(fields: [placeId], references: [id])
+  currenciesAccepted  Currency[]        @relation("LocalBusinessCurrencies")   
+  openingHours        String?                        
+  paymentAccepted     PaymentMethod[]   @relation("LocationPayments")
+  priceRange          String?
+  localBusinessType   LocalBusinessType?           
+}
+
+enum LocalBusinessType {
+  ANIMAL_SHELTER
+  ARCHIVE_ORGANIZATION
+  AUTOMOTIVE_BUSINESS
+  CHILD_CARE
+  DENTIST
+  DRY_CLEANING_OR_LAUNDRY
+  EMERGENCY_SERVICE
+  EMPLOYMENT_AGENCY
+  ENTERTAINMENT_BUSINESS
+  FINANCIAL_SERVICE
+  FOOD_ESTABLISHMENT
+  GOVERNMENT_OFFICE
+  HEALTH_AND_BEAUTY_BUSINESS
+  HOME_AND_CONSTRUCTION_BUSINESS
+  INTERNET_CAFE
+  LEGAL_SERVICE
+  LIBRARY
+  LODGING_BUSINESS
+  MEDICAL_BUSINESS
+  PROFESSIONAL_SERVICE
+  RADIO_STATION
+  REAL_ESTATE_AGENT
+  RECYCLING_CENTER
+  SELF_STORAGE
+  SHOPPING_CENTER
+  SPORTS_ACTIVITY_LOCATION
+  STORE
+  TELEVISION_STATION
+  TOURIST_INFORMATION_CENTER
+  TRAVEL_AGENCY
+}
+
+model PostalAddress {
+  id                Int    @id @default(autoincrement())
+  streetAddress     String
+  streetAddress2    String?
+  addressLocality   String
+  addressRegion     String
+  postalCode        String
+  addressCountry    String
+  listings          Listing[]
+}
+
+model GeoCoordinates {
+  id        Int     @id @default(autoincrement())
+  latitude  Float
+  longitude Float
+}
+
+model AggregateRating {
+  id                Int     @id @default(autoincrement())
+  ratingValue       Float
+  reviewCount       Int
+}
+
+model Currency {
+  id                Int             @id @default(autoincrement())
+  name              String
+  localBusinesses   LocalBusiness[]  @relation("LocalBusinessCurrencies")
+}
+
+model PaymentMethod {
+  id                Int             @id @default(autoincrement())
+  name              String
+  localBusinessId   Int
+  localBusiness     LocalBusiness   @relation("LocationPayments", fields: [localBusinessId], references: [id])
+}
+
+model Review {
+  id          Int       @id @default(autoincrement())
+  listingId   Int
+  listing     Listing   @relation(fields: [listingId], references: [id])
+  userId      Int
+  author      User      @relation(fields: [userId], references: [id])
+  reviewBody  String
+  rating      Int
+  dtCreated   DateTime  @default(now())
+  dtUpdated   DateTime
+}
+
+model ListingImage {
+  id          Int       @id @default(autoincrement())
+  contentUrl  String
+  caption     String?
+  listingId   Int
+  Listing     Listing   @relation(fields: [listingId], references: [id])
+  userId      Int
+  User        User      @relation("UserImages", fields: [userId], references: [id])
+  dtCreated   DateTime  @default(now())
+  dtUpdated   DateTime
+}
+
+model Favorite {
+  userId        Int           
+  user          User          @relation(fields: [userId], references: [id])
+  listingId     Int           
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  dtCreated     DateTime      @default(now())
+  dtUpdated     DateTime
+
+  @@id([userId, listingId])
+}
+
+model User {
+  id            Int               @id @default(autoincrement())
+  name          String
+  email         String            @unique
+  roleId        Int               @default(4)
+  role          Role              @relation(fields: [roleId], references: [id])
+  reviews       Review[]
+  favorites     Favorite[]
+  images        ListingImage[]    @relation("UserImages")
+  listings      Listing[]         @relation("UserListings")
+  verifiedSubs  Submission[]      @relation("VerifiedBy")
+  subListings   Submission[]      @relation("SubmittedBy")
+  dtCreated     DateTime          @default(now())
+  dtUpdated     DateTime
+}
+
+model Submission {
+  id              Int                 @id @default(autoincrement())
+  status          SubmissionStatus
+  listingId       Int                 @unique
+  listing         Listing?            @relation("Submission")
+  submittedById   Int
+  submittedBy     User                @relation("SubmittedBy", fields: [submittedById], references: [id])
+  dtSubmitted     DateTime            @default(now())
+  verified        Boolean             @default(false)
+  verifiedById    Int?
+  verifiedBy      User?               @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  dtVerified      DateTime?
+}
+
+enum SubmissionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Role {
+  id            Int         @id @default(autoincrement())
+  name          RoleType
+  description   String?
+  privileges    Privilege[]
+  users         User[]        
+}
+
+enum RoleType {
+  SUPER_ADMIN
+  ADMIN
+  BUSINESS_OWNER
+  USER
+}
+
+enum Privilege {
+  CREATE_LISTING
+  EDIT_LISTING
+  DELETE_LISTING
+  VIEW_LISTING
+  MANAGE_USERS
+  SUBMIT_REVIEWS
+}
+
+model Pricing {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  price       Float
+  duration    String
+}
